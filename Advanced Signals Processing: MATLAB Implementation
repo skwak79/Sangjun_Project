@@ -1,0 +1,156 @@
+VideoNum = 3;
+saveFolderPath = 'C:\MATLAB Drive\work\work\RWristX_RShoulderX_Test';
+basePath = 'C:\MATLAB Drive\work\work';
+
+for i = 1:VideoNum
+    filename = fullfile(basePath, ['SampleData', num2str(i), '.csv']);
+    
+    if isfile(filename)
+
+    % Read Table for RWrist_X & Shoulder_X
+    T = readtable(filename, 'VariableNamingRule', 'preserve');
+    RWrist_X_data = T.RWrist_X;
+    RShoulder_X_data = T.RShoulder_X;  
+
+    fs = 30;
+    ts = 1/fs
+    figure;
+
+    % Raw Data Plot for RWrist_X
+    subplot(3, 2, 1); %First Subplot
+    len = length(RWrist_X_data);
+    plot((1:len)/fs, RWrist_X_data, '-');
+    title(['Raw Data: RWrist_X ', num2str(i)]);
+    xlabel('Time (seconds)');
+    ylabel('RWrist_X');
+    xlim([0 40]);
+
+    % Spectrogram Plot for RWrist_X
+    subplot(3, 2, 3); % Second Subplot
+    z_x = RWrist_X_data - mean(RWrist_X_data);
+    [~, f, t, p] = spectrogram(z_x, 150, 60, [], fs);
+    p_dB = 10*log10(abs(p)+eps); % Convert to dB, add eps to avoid log of zero
+    axis xy; 
+    xlim([0 40]); 
+    ylim([0 2]); 
+    xlabel('Time (s)');
+    ylabel('Frequency (Hz)');
+    title(['R_Wrist_X Spectrogram ', num2str(i)]);
+    hold on;
+    [fridge, ~] = tfridge(abs(p), f, 'NumRidges', 1);
+    plot(t, fridge, 'b', 'LineWidth', 2); % Plot ridge line in white for visibility
+    hold off;
+
+    % Frequency Estimation Plot for RWrist_X
+    subplot(3, 2, 5); % Third Subplot for RWrist_X
+        
+    window = 150;
+    overlap = 60;
+    step = window - overlap;
+    fhat_values_X = [];
+    
+    for j = 1:step:length(RWrist_X_data) - window
+        segment = RWrist_X_data(j:j + window - 1);
+        N = length(segment);
+        XL = toeplitz(segment(3:N), [segment(3) segment(2) segment(1)]);
+        [u, s, v] = svd(XL, 'econ');
+        
+        arg = v(2,3)/(v(1,3)+v(3,3));
+        arg = max(-1, min(arg, 1)); 
+        fhat = -acos(arg)/(2*pi);
+
+        if fhat < 0
+            fhat = fhat + 0.5;
+        end
+
+        fhat_values_X = [fhat_values_X, fhat / ts];
+
+    end
+    
+    % Time vector for plotting
+    time_vector = (1:step:length(RWrist_X_data) - window) / fs;
+    
+    % Plotting the frequency estimation
+    time_vector = time_vector + 3;
+    plot(time_vector, fhat_values_X, '-o'); % Line plot connecting the points
+    title(['Frequency Estimation: RWrist_X ', num2str(i)]);
+    xlabel('Time (s)');
+    ylabel('Frequency (Hz)');
+    xlim([0 40]);
+    ylim([0 2]);
+    
+    % Raw Data Plot for Shoulder_X
+    subplot(3, 2, 2);  %Fourth Subplot
+    plot((1:len)/fs, RShoulder_X_data, '-');
+    title(['Raw Data: RShoulder_X ', num2str(i)]);
+    xlabel('Time (seconds)');
+    ylabel('RShoulder_X');
+    xlim([0 40]);
+
+    % Spectrogram Plot for RShoulder_X
+    subplot(3, 2, 4); %Fifth Subplot
+    z_y = RShoulder_X_data - mean(RShoulder_X_data);
+    [~, f, t, p] = spectrogram(z_y, 150, 60, [], fs);
+    p_dB = 10*log10(abs(p)+eps); % Convert to dB, add eps to avoid log of zero
+    
+    % Plot the Spectrogram
+    axis xy; 
+    xlim([0 40]); 
+    ylim([0 2]); 
+    xlabel('Time (s)');
+    ylabel('Frequency (Hz)');
+    title(['RShoulder_X Spectrogram ', num2str(i)]);
+    hold on;
+    [fridge, ~] = tfridge(abs(p), f, 'NumRidges', 1);
+    plot(t, fridge, 'b', 'LineWidth', 2); % Plot ridge line in white for visibility
+    hold off;
+
+    % Frequency Estimation Plot for RShoulder_X
+    subplot(3, 2, 6); %Sixth Subplot
+    window = 150;
+    overlap = 60;
+    step = window - overlap;
+    fhat_values_Y = [];
+    
+    for j = 1:step:length(RShoulder_X_data) - window
+        segment = RShoulder_X_data(j:j + window - 1);
+        N = length(segment);
+        XL = toeplitz(segment(3:N), [segment(3) segment(2) segment(1)]);
+        [u, s, v] = svd(XL, 'econ');
+        
+        arg = v(2,3)/(v(1,3)+v(3,3));
+        arg = max(-1, min(arg, 1)); % Clip the argument to [-1, 1]
+        fhat = -acos(arg)/(2*pi);
+
+        if fhat < 0
+            fhat = fhat + 0.5;
+        end
+
+        fhat_values_Y = [fhat_values_Y, fhat / ts];
+
+    end
+    
+    % Time vector for plotting
+    time_vector = (1:step:length(RShoulder_X_data) - window) / fs;
+    
+    % Plotting the frequency estimation
+    time_vector = time_vector + 3;
+    plot(time_vector, fhat_values_Y, '-o'); % Line plot connecting the points
+    title(['Frequency Estimation: RShoulder_X ', num2str(i)]);
+    xlabel('Time (s)');
+    ylabel('Frequency (Hz)');
+    xlim([0 40]);
+    ylim([0 2]);
+
+    % Save the figure with all plots
+    combinedFilename = fullfile(saveFolderPath, ['RWrist_Shoulder_X_Test', num2str(i), '.png']);
+    saveas(gcf, combinedFilename);
+    close(gcf); % Close the figure after saving
+    else
+        warning(['File not found: ', filename]);
+        continue; 
+    end
+end
+   
+
+disp('Plots Saved...');
